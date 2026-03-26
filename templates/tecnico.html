@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Barmel - Reporte Técnico</title>
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Barmel">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .offline-banner {
+            display: none;
+            background: #dc3545;
+            color: white;
+            text-align: center;
+            padding: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+        .offline-banner.show { display: block; }
+        .pending-banner {
+            display: none;
+            background: #ffc107;
+            color: #333;
+            text-align: center;
+            padding: 6px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .pending-banner.show { display: block; }
+        .install-banner {
+            display: none;
+            background: #0d6efd;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 998;
+        }
+        .install-banner.show { display: block; }
+        .install-banner button {
+            background: white;
+            color: #0d6efd;
+            border: none;
+            padding: 4px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .install-banner .close-btn {
+            background: transparent;
+            color: white;
+            border: none;
+            font-size: 18px;
+            margin-left: 8px;
+            padding: 0 6px;
+        }
+    </style>
+</head>
+<body class="bg-light p-3">
+
+    <div id="installBanner" class="install-banner">
+        Instalar app en tu celular
+        <button onclick="instalarApp()">Instalar</button>
+        <button class="close-btn" onclick="cerrarInstall()">&times;</button>
+    </div>
+
+    <div id="offlineBanner" class="offline-banner">Sin conexion a internet</div>
+    <div id="pendingBanner" class="pending-banner">Reportes pendientes por enviar: <span id="pendingCount">0</span></div>
+
+    <form id="formReporte" class="card shadow p-4">
+
+        <div class="text-center mb-3">
+            <img src="/static/logo.png" alt="Barmel Corporation" style="max-height: 80px; max-width: 100%;">
+        </div>
+        <h5 class="text-center mb-4 text-primary">Reporte de Visita Tecnica</h5>
+
+        <input type="hidden" id="gps_inicio">
+        <input type="hidden" id="gps_llegada">
+
+        <div class="mb-4 text-center border p-3 bg-white rounded shadow-sm">
+            <p class="small text-muted mb-2">Paso 1: Al salir hacia donde el cliente</p>
+            <button type="button" class="btn btn-warning w-100 fw-bold shadow-sm" onclick="capturarInicio()" id="btnInicio">
+                1. Iniciar Ruta (Guardar Salida)
+            </button>
+            <small id="msgInicio" class="text-success fw-bold mt-2 d-none block">GPS de salida registrado</small>
+            <div id="km_counter" class="text-center fw-bold text-primary fs-6 d-none mt-2 p-2 border rounded bg-light">📡 Rastreo activo: 0.00 KM</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="text-muted small fw-bold">Fecha de Visita</label>
+            <input type="date" id="fechaAuto" class="form-control bg-light text-primary fw-bold" required readonly>
+        </div>
+
+        <div class="mb-3">
+            <label class="text-muted small fw-bold">Seleccione al Tecnico</label>
+            <select id="tecnico" class="form-select" required>
+                <option value="" disabled selected>-- Seleccione su nombre --</option>
+                {% for nombre in lista %}
+                <option value="{{ nombre }}">{{ nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <input type="text" id="empresa" placeholder="Empresa Visitada" class="form-control" required>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col"><label class="text-muted small">Hora Salida</label><input type="time" id="h_salida_base" class="form-control" required></div>
+            <div class="col"><label class="text-muted small">Hora Llegada</label><input type="time" id="h_llegada_cli" class="form-control" required></div>
+        </div>
+
+        <div class="mb-3">
+            <textarea id="trabajo" placeholder="Trabajo Realizado / Fallas" class="form-control" required></textarea>
+        </div>
+
+        <div class="mb-4 p-3 bg-white border rounded shadow-sm">
+            <label class="form-label fw-bold text-primary">Foto del Reporte Fisico:</label>
+            <input type="file" id="foto_reporte" accept="image/*" capture="environment" class="form-control" required>
+            <small class="text-muted d-block mt-1">Toma una foto clara del documento firmado.</small>
+        </div>
+
+        <p class="small text-muted mb-1 text-center mt-4">Paso 2: Al terminar la visita</p>
+        <button type="submit" id="btnEnviar" class="btn btn-primary w-100 py-3 fw-bold shadow">2. Enviar Reporte Final</button>
+    </form>
+
+    <div class="text-center mt-3 mb-5">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="nuevoReporte()">Nuevo Reporte (Limpiar todo)</button>
+    </div>
+
+    <script>
+        var STORAGE_KEY = 'barmel_reporte_v3';
+        var PENDING_KEY = 'barmel_pending_reports';
+
+        localStorage.removeItem('barmel_reporte_draft');
+        localStorage.removeItem('barmel_reporte_v2');
+
+        var camposTexto = ['fechaAuto', 'tecnico', 'empresa', 'h_salida_base', 'h_llegada_cli', 'trabajo'];
+
+        // Tracking GPS en tiempo real
+        var watchId = null;
+        var gps_array = [];
+        var km_acumulado = 0.0;
+
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            var R = 6371; 
+            var dLat = (lat2-lat1) * Math.PI / 180;
+            var dLon = (lon2-lon1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function iniciarRastreo() {
+            if (navigator.geolocation && watchId === null) {
+                watchId = navigator.geolocation.watchPosition(function(p) {
+                    var lat = p.coords.latitude;
+                    var lon = p.coords.longitude;
+                    if (gps_array.length > 0) {
+                        var last = gps_array[gps_array.length - 1];
+                        var dist = calcularDistancia(last.lat, last.lon, lat, lon);
+                        // Filtro de ruido: un movimiento debe ser > 10m y < 5km de golpe
+                        if (dist > 0.01 && dist < 5.0) { 
+                            km_acumulado += dist;
+                        }
+                    }
+                    gps_array.push({lat: lat, lon: lon, timestamp: Date.now()});
+                    var counter = document.getElementById('km_counter');
+                    if(counter) {
+                        counter.innerText = "📡 Rastreo GPS activo - Recorrido: " + km_acumulado.toFixed(2) + " KM";
+                        counter.classList.remove('d-none');
+                    }
+                    guardarBorrador();
+                }, function(err) { console.warn("GPS watch warn:", err); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            }
+        }
+
+        function guardarBorrador() {
+            var gps = document.getElementById('gps_inicio').value;
+            var rutaIniciada = document.getElementById('btnInicio').classList.contains('btn-success');
+            if (!rutaIniciada) return;
+            var datos = { 
+                gps_inicio: gps, 
+                _rutaIniciada: true, 
+                _timestamp: Date.now(),
+                _gps_array: gps_array,
+                _km_acumulado: km_acumulado
+            };
+            camposTexto.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) datos[id] = el.value;
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(datos));
+        }
+
+        function restaurarBorrador() {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            try {
+                var datos = JSON.parse(raw);
+                if (!datos._rutaIniciada || !datos.gps_inicio) { localStorage.removeItem(STORAGE_KEY); return; }
+                if (Date.now() - (datos._timestamp || 0) > 24 * 60 * 60 * 1000) { localStorage.removeItem(STORAGE_KEY); return; }
+                document.getElementById('gps_inicio').value = datos.gps_inicio;
+                
+                if (datos._km_acumulado) km_acumulado = datos._km_acumulado;
+                if (datos._gps_array) gps_array = datos._gps_array;
+
+                camposTexto.forEach(function(id) {
+                    var el = document.getElementById(id);
+                    if (el && datos[id]) el.value = datos[id];
+                });
+                document.getElementById('btnInicio').classList.replace('btn-warning', 'btn-success');
+                document.getElementById('btnInicio').innerText = "Ruta Iniciada (Salida Guardada)";
+                document.getElementById('msgInicio').classList.remove('d-none');
+                
+                // Reiniciar rastreo con estado recuperado
+                var counter = document.getElementById('km_counter');
+                if(counter) {
+                    counter.innerText = "📡 Rastreo GPS recuperado - Recorrido: " + km_acumulado.toFixed(2) + " KM";
+                    counter.classList.remove('d-none');
+                }
+                iniciarRastreo();
+
+            } catch(e) { localStorage.removeItem(STORAGE_KEY); }
+        }
+
+        function nuevoReporte() {
+            if (confirm('Seguro que deseas borrar todos los datos y empezar un reporte nuevo?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                location.reload();
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function() { resolve(reader.result); };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function getPending() {
+            try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; }
+            catch(e) { return []; }
+        }
+
+        function savePending(list) {
+            localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+            updatePendingBanner();
+        }
+
+        function updatePendingBanner() {
+            var pending = getPending();
+            var banner = document.getElementById('pendingBanner');
+            var count = document.getElementById('pendingCount');
+            if (pending.length > 0) {
+                banner.classList.add('show');
+                count.textContent = pending.length;
+            } else {
+                banner.classList.remove('show');
+            }
+        }
+
+        async function enviarReporte(datos) {
+            var formData = new FormData();
+            formData.append('fecha', datos.fecha);
+            formData.append('tecnico', datos.tecnico);
+            formData.append('empresa', datos.empresa);
+            formData.append('h_salida_base', datos.h_salida_base);
+            formData.append('h_llegada_cli', datos.h_llegada_cli);
+            formData.append('trabajo', datos.trabajo);
+            formData.append('gps_inicio', datos.gps_inicio);
+            formData.append('gps_llegada', datos.gps_llegada);
+            formData.append('km_realtime', datos.km_realtime || '0.0');
+
+            if (datos.foto_base64) {
+                var resp = await fetch(datos.foto_base64);
+                var blob = await resp.blob();
+                formData.append('foto_reporte', blob, 'reporte.jpg');
+            }
+
+            var response = await fetch('/guardar', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Server error: ' + response.status);
+            return await response.json();
+        }
+
+        async function syncPending() {
+            var pending = getPending();
+            if (pending.length === 0) return;
+            var remaining = [];
+            for (var i = 0; i < pending.length; i++) {
+                try {
+                    await enviarReporte(pending[i]);
+                } catch(e) {
+                    remaining.push(pending[i]);
+                }
+            }
+            savePending(remaining);
+            if (remaining.length === 0 && pending.length > 0) {
+                alert('Todos los reportes pendientes fueron enviados exitosamente.');
+            }
+        }
+
+        var hoy = new Date();
+        document.getElementById('fechaAuto').value = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0');
+        restaurarBorrador();
+        document.getElementById('fechaAuto').removeAttribute('readonly');
+        updatePendingBanner();
+
+        camposTexto.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', guardarBorrador);
+                el.addEventListener('change', guardarBorrador);
+            }
+        });
+
+        function capturarInicio() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(p) {
+                    document.getElementById('gps_inicio').value = p.coords.latitude + "," + p.coords.longitude;
+                    document.getElementById('btnInicio').classList.replace('btn-warning', 'btn-success');
+                    document.getElementById('btnInicio').innerText = "Ruta Iniciada (Salida Guardada)";
+                    document.getElementById('msgInicio').classList.remove('d-none');
+                    
+                    // Empezar a trackear
+                    gps_array = [{lat: p.coords.latitude, lon: p.coords.longitude, timestamp: Date.now()}];
+                    km_acumulado = 0.0;
+                    iniciarRastreo();
+                    
+                    guardarBorrador();
+                }, function() {
+                    alert("Error al capturar GPS. Asegurate de dar permisos de ubicacion al navegador.");
+                }, { enableHighAccuracy: true, timeout: 15000 });
+            } else {
+                alert("Tu navegador no soporta GPS.");
+            }
+        }
+
+        document.getElementById('formReporte').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (document.getElementById('gps_inicio').value === "") {
+                alert("Olvidaste presionar Iniciar Ruta cuando saliste. Presionalo ahora antes de enviar el reporte.");
+                return;
+            }
+
+            var fotoInput = document.getElementById('foto_reporte');
+            if (!fotoInput.files || !fotoInput.files[0]) {
+                alert("Debes tomar una foto del reporte fisico.");
+                return;
+            }
+
+            var btn = document.getElementById('btnEnviar');
+            btn.disabled = true;
+            btn.textContent = "Enviando...";
+
+            var foto_base64 = await fileToBase64(fotoInput.files[0]);
+
+            var datos = {
+                fecha: document.getElementById('fechaAuto').value,
+                tecnico: document.getElementById('tecnico').value,
+                empresa: document.getElementById('empresa').value,
+                h_salida_base: document.getElementById('h_salida_base').value,
+                h_llegada_cli: document.getElementById('h_llegada_cli').value,
+                trabajo: document.getElementById('trabajo').value,
+                gps_inicio: document.getElementById('gps_inicio').value,
+                gps_llegada: '',
+                km_realtime: km_acumulado.toString(),
+                foto_base64: foto_base64
+            };
+
+            function finalizarEnvio(datos) {
+                if (navigator.onLine) {
+                    enviarReporte(datos).then(function(result) {
+                        localStorage.removeItem(STORAGE_KEY);
+                        alert('REPORTE GUARDADO EXITOSAMENTE\n\nReporte #' + result.id + '\nTecnico: ' + (result.tecnico || datos.tecnico) + '\nEmpresa: ' + (result.empresa || datos.empresa) + '\nDistancia GPS: ' + result.km + ' KM');
+                        location.reload();
+                    }).catch(function(err) {
+                        console.error('Error enviando reporte:', err);
+                        var pending = getPending();
+                        pending.push(datos);
+                        savePending(pending);
+                        localStorage.removeItem(STORAGE_KEY);
+                        alert('Sin conexion. El reporte se guardo localmente y se enviara cuando haya internet.');
+                        location.reload();
+                    });
+                } else {
+                    var pending = getPending();
+                    pending.push(datos);
+                    savePending(pending);
+                    localStorage.removeItem(STORAGE_KEY);
+                    alert('Sin conexion. El reporte se guardo localmente y se enviara cuando haya internet.');
+                    location.reload();
+                }
+            }
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(p) {
+                    datos.gps_llegada = p.coords.latitude + "," + p.coords.longitude;
+                    finalizarEnvio(datos);
+                }, function() {
+                    alert("No se pudo capturar el GPS de llegada, pero el reporte se enviara de todos modos.");
+                    finalizarEnvio(datos);
+                }, { enableHighAccuracy: true, timeout: 15000 });
+            } else {
+                finalizarEnvio(datos);
+            }
+        });
+
+        window.addEventListener('online', function() {
+            document.getElementById('offlineBanner').classList.remove('show');
+            syncPending();
+        });
+        window.addEventListener('offline', function() {
+            document.getElementById('offlineBanner').classList.add('show');
+        });
+        if (!navigator.onLine) {
+            document.getElementById('offlineBanner').classList.add('show');
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(function(reg) {
+                    console.log('Service Worker registrado');
+                    reg.addEventListener('updatefound', function() {
+                        var newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'activated') {
+                                syncPending();
+                            }
+                        });
+                    });
+                })
+                .catch(function(err) { console.log('SW error:', err); });
+
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'TRIGGER_SYNC') {
+                    syncPending();
+                }
+            });
+        }
+
+        var deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installBanner').classList.add('show');
+        });
+
+        function instalarApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function(result) {
+                    deferredPrompt = null;
+                    document.getElementById('installBanner').classList.remove('show');
+                });
+            }
+        }
+
+        function cerrarInstall() {
+            document.getElementById('installBanner').classList.remove('show');
+        }
+
+        window.addEventListener('appinstalled', function() {
+            document.getElementById('installBanner').classList.remove('show');
+            deferredPrompt = null;
+        });
+
+        if (navigator.onLine) {
+            syncPending();
+        }
+    </script>
+</body>
+</html>

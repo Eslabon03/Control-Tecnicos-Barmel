@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Técnicos - Barmel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light p-4">
+    <div class="container" style="max-width: 800px;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center">
+                <img src="/static/logo.png" alt="Barmel" height="60" class="me-3 shadow-sm rounded">
+                <h2 class="mb-0 text-primary fw-bold">🤵 Gestión de Técnicos</h2>
+            </div>
+            <a href="/admin" class="btn btn-outline-secondary fw-bold">← Volver al Panel</a>
+        </div>
+
+        <div class="card shadow border-0 mb-4">
+            <div class="card-header bg-dark text-white fw-bold">
+                ➕ Agregar Nuevo Técnico
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/admin/tecnicos" class="d-flex gap-2">
+                    <input type="text" name="nombre" class="form-control" placeholder="Nombre completo del técnico" required autocomplete="off">
+                    <button type="submit" class="btn btn-success fw-bold px-4">Guardar</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow border-0">
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover table-striped mb-0 text-center align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID Técnico</th>
+                            <th>Nombre Completo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in tecnicos %}
+                        <tr>
+                            <td class="text-secondary fw-bold">#{{ t.id }}</td>
+                            <td class="fw-bold fs-5 text-dark">{{ t.nombre }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="2" class="text-muted p-4">Aún no hay técnicos en la base de datos.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
