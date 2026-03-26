@@ -214,5 +214,27 @@ def admin_tecnicos():
     tecnicos = Tecnico.query.order_by(Tecnico.nombre).all()
     return render_template('tecnicos_admin.html', tecnicos=tecnicos)
 
+@app.route('/admin/tecnicos/editar/<int:id>', methods=['POST'])
+@login_required
+def editar_tecnico(id):
+    tecnico = Tecnico.query.get_or_404(id)
+    nuevo_nombre = request.form.get('nombre', '').strip()
+    if nuevo_nombre:
+        existe = Tecnico.query.filter(Tecnico.nombre == nuevo_nombre, Tecnico.id != id).first()
+        if not existe:
+            tecnico.nombre = nuevo_nombre
+            db.session.commit()
+            logger.info("Técnico modificado: ID %s a %s", id, nuevo_nombre)
+    return redirect('/admin/tecnicos')
+
+@app.route('/admin/tecnicos/borrar/<int:id>', methods=['POST'])
+@login_required
+def borrar_tecnico(id):
+    tecnico = Tecnico.query.get_or_404(id)
+    db.session.delete(tecnico)
+    db.session.commit()
+    logger.info("Técnico eliminado: ID %s (%s)", id, tecnico.nombre)
+    return redirect('/admin/tecnicos')
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
