@@ -15,6 +15,10 @@ app.secret_key = "barmel_secret_2026"
 
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
+    # Solucion al famoso bug de Render usando PostgreSQL en Flask
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+        
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     logger.info("Usando PostgreSQL (persistente)")
 else:
