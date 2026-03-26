@@ -35,6 +35,7 @@
                         <tr>
                             <th>ID Técnico</th>
                             <th>Nombre Completo</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -42,10 +43,16 @@
                         <tr>
                             <td class="text-secondary fw-bold">#{{ t.id }}</td>
                             <td class="fw-bold fs-5 text-dark">{{ t.nombre }}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary shadow-sm me-2 fw-bold" onclick="editarTecnico({{ t.id }}, '{{ t.nombre | escape }}')">✏️ Editar</button>
+                                <form method="POST" action="/admin/tecnicos/borrar/{{ t.id }}" style="display:inline;" onsubmit="return confirm('¿Estás seguro de que deseas borrar definitivamente a este técnico? ¡Revisa que no tenga reportes activos antes de borrarlo!');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm fw-bold">🗑️ Borrar</button>
+                                </form>
+                            </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="2" class="text-muted p-4">Aún no hay técnicos en la base de datos.</td>
+                            <td colspan="3" class="text-muted p-4">Aún no hay técnicos en la base de datos.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -53,5 +60,26 @@
             </div>
         </div>
     </div>
+
+    <script>
+    function editarTecnico(id, nombreActual) {
+        let nuevoNombre = prompt("Editar nombre del técnico:", nombreActual);
+        
+        if (nuevoNombre !== null && nuevoNombre.trim() !== "" && nuevoNombre.trim() !== nombreActual) {
+            let form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/admin/tecnicos/editar/" + id;
+            
+            let input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "nombre";
+            input.value = nuevoNombre.trim();
+            
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    </script>
 </body>
 </html>
