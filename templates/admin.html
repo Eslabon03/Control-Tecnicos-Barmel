@@ -42,14 +42,18 @@
             </div>
         </div>
 
-        <div class="card shadow border-0">
+        {% for tecnico, grupo in reportes|groupby('tecnico') %}
+        <div class="card shadow border-0 mb-5">
+            <div class="card-header bg-primary text-white fw-bold fs-5 d-flex justify-content-between align-items-center">
+                <span>👨‍🔧 Técnico: {{ tecnico }}</span>
+                <span class="badge bg-light text-primary fs-6">{{ grupo|length }} Visitas</span>
+            </div>
             <div class="card-body p-0 table-responsive">
                 <table class="table table-hover table-striped mb-0 text-center align-middle">
                     <thead class="table-dark">
                         <tr>
-                            <th>Correlativo</th>
                             <th>Fecha</th>
-                            <th>Técnico</th>
+                            <th>ID (#)</th>
                             <th>Empresa Visitada</th>
                             <th>Horarios (Salida - Llegada)</th>
                             <th>KM por GPS</th>
@@ -58,11 +62,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for r in reportes %}
+                        {% for r in grupo|sort(attribute='id', reverse=True) %}
                         <tr>
-                            <td><span class="badge bg-secondary fs-6">#{{ r.id }}</span></td>
                             <td class="fw-bold text-success">{{ r.fecha }}</td>
-                            <td class="fw-bold">{{ r.tecnico }}</td>
+                            <td><span class="badge bg-secondary fs-6">#{{ r.id }}</span></td>
                             <td>{{ r.empresa }}</td>
                             <td>{{ r.h_salida_base }} a {{ r.h_llegada_cli }}</td>
                             <td class="text-primary fw-bold fs-6">{% if r.km_recorridos is not none and r.km_recorridos > 0 %}{{ r.km_recorridos }} KM{% elif r.km_llegada is not none and r.km_salida is not none %}{{ r.km_llegada - r.km_salida }} KM{% else %}0 KM{% endif %}</td>
@@ -92,6 +95,7 @@
                 </table>
             </div>
         </div>
+        {% endfor %}
 
     </div>
 </body>
