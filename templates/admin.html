@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Administrativo - Barmel Corporation</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .hover-card {
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .hover-card:hover {
+            transform: scale(1.03);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+        }
+    </style>
 </head>
 <body class="bg-light p-4">
     <div class="container-fluid">
@@ -19,84 +29,102 @@
             </div>
         </div>
 
-        <div class="card shadow border-0 mb-4">
-            <div class="card-header bg-dark text-white fw-bold">
-                <span>📊</span> Kilometraje Total por Técnico
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    {% for t in km_por_tecnico %}
-                    <div class="col-md-4 col-lg-3 col-sm-6">
-                        <div class="card border-primary h-100 shadow-sm">
-                            <div class="card-body text-center p-3">
-                                <h6 class="card-title fw-bold text-dark mb-2">{{ t.nombre }}</h6>
-                                <p class="display-6 fw-bold text-primary mb-1">{{ t.total_km }}</p>
-                                <small class="text-muted">KM recorridos</small>
-                                <hr class="my-2">
-                                <span class="badge bg-success fs-6">{{ t.total_visitas }} visita{{ 's' if t.total_visitas != 1 else '' }}</span>
-                            </div>
-                        </div>
+        <div class="alert alert-warning fw-bold text-center shadow-sm">
+            👆 Toca TheTarjeta de cualquier Técnico para expandir y ver todo su Historial separado por Semanas.
+        </div>
+
+        <div class="row g-3 mb-4">
+            {% for t in km_por_tecnico %}
+            <div class="col-md-4 col-lg-3 col-sm-6">
+                <!-- Tarjeta clickeable que abre el modal -->
+                <div class="card border-primary h-100 shadow-sm hover-card" data-bs-toggle="modal" data-bs-target="#modal-tec-{{ loop.index }}">
+                    <div class="card-body text-center p-3">
+                        <h6 class="card-title fw-bold text-dark mb-2">{{ t.nombre }}</h6>
+                        <p class="display-6 fw-bold text-primary mb-1">{{ t.total_km }}</p>
+                        <small class="text-muted">KM recorridos</small>
+                        <hr class="my-2">
+                        <span class="badge bg-success fs-6">{{ t.total_visitas }} visita{{ 's' if t.total_visitas != 1 else '' }}</span>
                     </div>
-                    {% endfor %}
                 </div>
             </div>
-        </div>
 
-        {% for tecnico, grupo in reportes|groupby('tecnico') %}
-        <div class="card shadow border-0 mb-5">
-            <div class="card-header bg-primary text-white fw-bold fs-5 d-flex justify-content-between align-items-center">
-                <span>👨‍🔧 Técnico: {{ tecnico }}</span>
-                <span class="badge bg-light text-primary fs-6">{{ grupo|length }} Visitas</span>
+            <!-- Ventana Modal de su Historial -->
+            <div class="modal fade" id="modal-tec-{{ loop.index }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title fw-bold">👨‍🔧 Historial de Movimientos: {{ t.nombre }}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body bg-light">
+                            <!-- Buscamos en la lista global SOLO a este tecnico -->
+                            {% set mis_reportes = reportes | selectattr("tecnico", "equalto", t.nombre) | list %}
+                            
+                            <!-- Ahora dividimos a ese tecnico separado por Semanas en su propia tabla -->
+                            {% for semana, grupo_sem in mis_reportes | groupby('semana_str') | reverse %}
+                            <div class="card shadow-sm border-0 mb-4">
+                                <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                                    <span>📅 {{ semana }}</span>
+                                    <span class="badge bg-secondary">{{ grupo_sem|length }} Visitas esta semana</span>
+                                </div>
+                                <div class="card-body p-0 table-responsive">
+                                    <table class="table table-hover table-striped mb-0 text-center align-middle">
+                                        <thead class="table-secondary">
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>ID (#)</th>
+                                                <th>Empresa Visitada</th>
+                                                <th>Horarios (S - L)</th>
+                                                <th>KM por GPS</th>
+                                                <th>Ruta</th>
+                                                <th>Reporte</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for r in grupo_sem | sort(attribute='id', reverse=True) %}
+                                            <tr>
+                                                <td class="fw-bold text-success">{{ r.fecha }}</td>
+                                                <td><span class="badge bg-secondary fs-6">#{{ r.id }}</span></td>
+                                                <td>{{ r.empresa }}</td>
+                                                <td>{{ r.h_salida_base }} a {{ r.h_llegada_cli }}</td>
+                                                <td class="text-primary fw-bold fs-6">{% if r.km_recorridos and r.km_recorridos > 0 %}{{ r.km_recorridos }} KM{% elif r.km_llegada and r.km_salida %}{{ r.km_llegada - r.km_salida }} KM{% else %}0 KM{% endif %}</td>
+                                                <td>
+                                                    {% if r.gps_inicio and r.gps_llegada %}
+                                                    <a href="https://www.google.com/maps/dir/?api=1&origin={{ r.gps_inicio }}&destination={{ r.gps_llegada }}" target="_blank" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">🗺️ Ver Mapa</a>
+                                                    {% else %}
+                                                    <span class="badge bg-light text-muted border">Sin Ruta</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if r.foto_base64 %}
+                                                    <a href="{{ r.foto_base64 }}" target="_blank">
+                                                        <img src="{{ r.foto_base64 }}" width="50" class="img-thumbnail shadow-sm" style="cursor: zoom-in;" alt="Ver Reporte">
+                                                    </a>
+                                                    {% else %}
+                                                    <span class="badge bg-light text-muted border">Sin Foto</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% else %}
+                                <div class="alert alert-secondary text-center">Todavía no hay historial registrado para este empleado.</div>
+                            {% endfor %}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cerrar Historial</button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body p-0 table-responsive">
-                <table class="table table-hover table-striped mb-0 text-center align-middle">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Fecha</th>
-                            <th>ID (#)</th>
-                            <th>Empresa Visitada</th>
-                            <th>Horarios (Salida - Llegada)</th>
-                            <th>KM por GPS</th>
-                            <th>Trazabilidad GPS (Ruta)</th>
-                            <th>Reporte Escaneado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in grupo|sort(attribute='id', reverse=True) %}
-                        <tr>
-                            <td class="fw-bold text-success">{{ r.fecha }}</td>
-                            <td><span class="badge bg-secondary fs-6">#{{ r.id }}</span></td>
-                            <td>{{ r.empresa }}</td>
-                            <td>{{ r.h_salida_base }} a {{ r.h_llegada_cli }}</td>
-                            <td class="text-primary fw-bold fs-6">{% if r.km_recorridos is not none and r.km_recorridos > 0 %}{{ r.km_recorridos }} KM{% elif r.km_llegada is not none and r.km_salida is not none %}{{ r.km_llegada - r.km_salida }} KM{% else %}0 KM{% endif %}</td>
-
-                            <td>
-                                {% if r.gps_inicio and r.gps_llegada %}
-                                <a href="https://www.google.com/maps/dir/?api=1&origin={{ r.gps_inicio }}&destination={{ r.gps_llegada }}" target="_blank" class="btn btn-sm btn-outline-danger fw-bold shadow-sm">
-                                    🗺️ Ver Ruta en Mapa
-                                </a>
-                                {% else %}
-                                <span class="badge bg-light text-muted border">Sin GPS Completo</span>
-                                {% endif %}
-                            </td>
-
-                            <td>
-                                {% if r.foto_base64 %}
-                                <a href="{{ r.foto_base64 }}" target="_blank">
-                                    <img src="{{ r.foto_base64 }}" width="70" class="img-thumbnail shadow-sm" style="cursor: zoom-in;" alt="Ver Reporte">
-                                </a>
-                                {% else %}
-                                <span class="badge bg-light text-muted border">Sin Foto</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-
     </div>
+
+    <!-- Cargar dependencias de animacion Javascript Bootstrap 5 obligatorias para abrir las Ventanas! -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
