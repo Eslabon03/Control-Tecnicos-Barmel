@@ -133,7 +133,6 @@ def guardar():
         if km_realtime_str:
             try:
                 km = float(km_realtime_str)
-                # Si el realtime es menor (ej. app suspendida), usar lineal
                 if km < km_lineal:
                     km = km_lineal
             except ValueError:
@@ -158,9 +157,6 @@ def guardar():
         db.session.add(nuevo)
         db.session.commit()
 
-        total = Reporte.query.count()
-        logger.info("EXITO: Reporte #%d guardado (tecnico=%s, empresa=%s, km=%.2f). Total en BD: %d", nuevo.id, tecnico_name, empresa_name, km, total)
-
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({"ok": True, "id": nuevo.id, "km": km, "tecnico": tecnico_name, "empresa": empresa_name})
 
@@ -177,6 +173,14 @@ def guardar():
 @login_required
 def admin():
     reportes = Reporte.query.order_by(Reporte.id.desc()).all()
+    
+    # MAGIC: Aquí calculamos LA SEMANA para agrupar luego en el diseño
+    for r in reportes:
+        try:
+            r.semana_str = datetime.strptime(r.fecha, "%Y-%m-%d").strftime("Año %Y - Semana %W")
+        except:
+            r.semana_str = "Semana Desconocida"
+            
     hace_una_semana = datetime.utcnow() - timedelta(days=7)
     reportes_semana = Reporte.query.filter(Reporte.timestamp >= hace_una_semana).all()
     km_semana = 0.0
@@ -199,7 +203,6 @@ def admin():
         for r in resultados
     ]
 
-    logger.info("ADMIN: mostrando %d reportes, KM semana=%.2f, tecnicos=%d", len(reportes), km_semana, len(km_por_tecnico))
     return render_template('admin.html', reportes=reportes, total_km=km_semana, km_por_tecnico=km_por_tecnico)
 
 @app.route('/admin/tecnicos', methods=['GET', 'POST'])
