@@ -6,12 +6,21 @@ import base64
 import math
 import os
 import logging
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = "barmel_secret_2026"
+
+cloudinary.config(
+  cloud_name = "dbtf5ckzc",
+  api_key = "161971714213328",
+  api_secret = "GPGC7EgfY4LKRjoe6uTnuKH387U"
+)
 
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
@@ -115,15 +124,10 @@ def guardar():
     try:
         foto = request.files.get('foto_reporte')
         foto_b64 = ""
-        import uuid
         if foto:
-            upload_dir = os.path.join(app.root_path, 'static', 'uploads')
-            os.makedirs(upload_dir, exist_ok=True)
-            filename = f"reporte_{uuid.uuid4().hex}.jpg"
-            filepath = os.path.join(upload_dir, filename)
-            foto.save(filepath)
-            foto_b64 = f"/static/uploads/{filename}"
-            logger.info("Foto guardada en disco: %s", filepath)
+            upload_result = cloudinary.uploader.upload(foto, folder="reportes_tecnicos")
+            foto_b64 = upload_result.get("secure_url")
+            logger.info("Foto guardada en Cloudinary: %s", foto_b64)
 
         gps_inicio = request.form.get('gps_inicio', '')
         gps_llegada = request.form.get('gps_llegada', '')
