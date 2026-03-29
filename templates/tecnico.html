@@ -186,6 +186,7 @@
         }
 
         function guardarBorrador() {
+            if (window.isSubmitting) return;
             var gps = document.getElementById('gps_inicio').value;
             var rutaIniciada = document.getElementById('btnInicio').classList.contains('btn-success');
             if (!rutaIniciada) return;
@@ -370,6 +371,7 @@
             var btn = document.getElementById('btnEnviar');
             btn.disabled = true;
             btn.textContent = "Enviando...";
+            window.isSubmitting = true;
 
             var foto_base64 = await fileToBase64(fotoInput.files[0]);
 
