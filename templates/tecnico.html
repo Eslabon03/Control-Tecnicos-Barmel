@@ -142,6 +142,29 @@
         var STORAGE_KEY = 'barmel_reporte_v3';
         var PENDING_KEY = 'barmel_pending_reports';
 
+        // --- CONEXIÓN CON APP NATIVA BARMEL ---
+        // Esta función es llamada desde el código Kotlin en segundo plano
+        window.actualizarKmDesdeApp = function(km) {
+            console.log("Recibida distancia nativa: " + km);
+            // Actualizamos la variable global con el dato real del sensor físico
+            km_acumulado = km; 
+            
+            var counter = document.getElementById('km_counter');
+            if(counter) {
+                counter.innerHTML = "📡 <span class='text-success'>GPS Nativo Activo</span> - Recorrido: " + km_acumulado.toFixed(2) + " KM";
+                counter.classList.remove('d-none');
+            }
+            guardarBorrador();
+        };
+
+        // Solicitar reset a la App si empezamos de cero
+        function resetDistanciaNativa() {
+            if (window.BarmelApp && typeof window.BarmelApp.resetDistance === 'function') {
+                window.BarmelApp.resetDistance();
+            }
+        }
+        // --------------------------------------
+
         localStorage.removeItem('barmel_reporte_draft');
         localStorage.removeItem('barmel_reporte_v2');
 
@@ -238,6 +261,7 @@
         function nuevoReporte() {
             if (confirm('Seguro que deseas borrar todos los datos y empezar un reporte nuevo?')) {
                 localStorage.removeItem(STORAGE_KEY);
+                resetDistanciaNativa(); // Resetear el contador en la App
                 location.reload();
             }
         }
@@ -342,9 +366,16 @@
                     
                     // Empezar a trackear
                     gps_array = [{lat: p.coords.latitude, lon: p.coords.longitude, timestamp: Date.now()}];
-                    km_acumulado = 0.0;
-                    iniciarRastreo();
                     
+                    // Si estamos en la App nativa, intentamos obtener la distancia exacta
+                    if (window.BarmelApp && typeof window.BarmelApp.getDistance === 'function') {
+                        km_acumulado = window.BarmelApp.getDistance();
+                        console.log("Iniciando con distancia nativa: " + km_acumulado);
+                    } else {
+                        km_acumulado = 0.0;
+                    }
+                    
+                    iniciarRastreo();
                     guardarBorrador();
                 }, function() {
                     alert("Error al capturar GPS. Asegurate de dar permisos de ubicacion al navegador.");
